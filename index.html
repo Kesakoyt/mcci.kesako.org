@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCC Island Tracker (Live)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- DESIGN (CSS) --- */
+        :root {
+            --bg-dark: #0d0d0d;
+            --bg-card: #1a1a1a;
+            --text-main: #ffffff;
+            --text-dim: #a0a0a0;
+            --accent: #5865F2; 
+            --accent-hover: #4752c4;
+            --border: #333333;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+        }
+
+        /* Titre */
+        h1 { margin: 0 0 10px 0; text-align: center; font-size: 1.8rem; }
+        .subtitle { text-align: center; color: var(--text-dim); margin-bottom: 30px; font-size: 0.9rem; }
+
+        /* Recherche */
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border 0.2s;
+        }
+        input:focus { border-color: var(--accent); }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: var(--accent-hover); }
+        button:disabled { background-color: #333; cursor: wait; }
+
+        /* Messages */
+        .msg { padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; display: none; }
+        .error { background: rgba(231, 76, 60, 0.2); color: #ff6b6b; border: 1px solid var(--danger); }
+        .loading { color: var(--text-dim); font-style: italic; }
+
+        /* Carte Résultat */
+        #resultCard { display: none; animation: slideUp 0.4s ease; }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .header-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        .avatar {
+            width: 64px; height: 64px;
+            border-radius: 12px;
+            background: #000;
+            border: 2px solid var(--border);
+        }
+
+        .user-details h2 { margin: 0; font-size: 1.4rem; }
+        .uuid { font-size: 0.75rem; color: var(--text-dim); font-family: monospace; display: block; margin-top: 4px; }
+
+        .status-badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .online { background: rgba(46, 204, 113, 0.2); color: var(--success); }
+        .offline { background: rgba(231, 76, 60, 0.2); color: var(--danger); }
+
+        /* Stats Wallet */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .stat-item {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-val { display: block; font-size: 1.3rem; font-weight: 800; margin-top: 5px; }
+        .coin-text { color: #f1c40f; }
+        .gem-text { color: #9b59b6; }
+
+        /* Factions */
+        h3 { font-size: 0.9rem; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; }
+        .faction-list { list-style: none; padding: 0; margin: 0; }
+        .faction-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .faction-row:last-child { border-bottom: none; }
+        .level { font-weight: bold; color: white; }
+
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🏝️ MCCI Live Stats</h1>
+        <p class="subtitle">Connexion API Directe via Proxy</p>
+
+        <div class="search-container">
+            <input type="text" id="username" placeholder="Pseudo Minecraft (ex: Noxite)" autocomplete="off">
+            <button id="btnSearch">Voir Stats</button>
+        </div>
+
+        <div id="loading" class="msg loading">Récupération des données depuis MCC Island...</div>
+        <div id="error" class="msg error"></div>
+
+        <div id="resultCard">
+            <div class="card">
+                <div class="header-row">
+                    <img id="avatar" src="" class="avatar">
+                    <div class="user-details">
+                        <h2 id="displayName">Joueur</h2>
+                        <span id="displayUUID" class="uuid">UUID</span>
+                        <span id="status" class="status-badge offline">HORS LIGNE</span>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <small>COINS</small>
+                        <span id="coins" class="stat-val coin-text">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <small>GEMS</small>
+                        <span id="gems" class="stat-val gem-text">0</span>
+                    </div>
+                </div>
+
+                <h3>Progression Factions</h3>
+                <ul id="factionList" class="faction-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ================================================================
+           🔴 TA CLE EST ICI
+           ================================================================
+        */
+        const MY_API_KEY = "ONbR5ReMAHbjei314yq5IwagFIzSGThM"; 
+
+
+        // --- LOGIQUE DU CODE ---
+
+        const PROXY = "https://corsproxy.io/?";
+        const API_URL = "https://api.mccisland.net/graphql";
+        
+        // Sélecteurs
+        const btn = document.getElementById('btnSearch');
+        const input = document.getElementById('username');
+        const ui = {
+            loading: document.getElementById('loading'),
+            error: document.getElementById('error'),
+            card: document.getElementById('resultCard'),
+            name: document.getElementById('displayName'),
+            uuid: document.getElementById('displayUUID'),
+            avatar: document.getElementById('avatar'),
+            status: document.getElementById('status'),
+            coins: document.getElementById('coins'),
+            gems: document.getElementById('gems'),
+            list: document.getElementById('factionList')
+        };
+
+        // Actions
+        btn.addEventListener('click', runSearch);
+        input.addEventListener('keypress', (e) => { if(e.key === 'Enter') runSearch() });
+
+        async function runSearch() {
+            const user = input.value.trim();
+            if(!user) return;
+
+            // 1. Reset Interface
+            ui.error.style.display = 'none';
+            ui.card.style.display = 'none';
+            ui.loading.style.display = 'block';
+            btn.disabled = true;
+
+            try {
+                // 2. Appel API
+                const data = await fetchPlayer(user);
+                
+                // 3. Affichage
+                displayData(data, user);
+
+            } catch (err) {
+                console.error(err);
+                ui.error.textContent = err.message;
+                ui.error.style.display = 'block';
+            } finally {
+                ui.loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        async function fetchPlayer(username) {
+            // Requête GraphQL
+            const graphqlQuery = {
+                query: `
+                    query GetPlayer($username: String!) {
+                        player(username: $username) {
+                            uuid
+                            status { online server }
+                            wallet { coins gems }
+                            progression {
+                                factions { name level }
+                            }
+                        }
+                    }
+                `,
+                variables: { username: username }
+            };
+
+            // Fetch via Proxy pour éviter erreur CORS
+            const response = await fetch(PROXY + encodeURIComponent(API_URL), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': MY_API_KEY
+                },
+                body: JSON.stringify(graphqlQuery)
+            });
+
+            if (!response.ok) {
+                if(response.status === 403 || response.status === 401) {
+                    throw new Error("Erreur 403/401 : Ta clé API est refusée par Noxcrew.");
+                }
+                throw new Error(`Erreur réseau : ${response.status}`);
+            }
+
+            const json = await response.json();
+
+            if (json.errors) {
+                // Erreur GraphQL (ex: Joueur introuvable)
+                throw new Error("Ce joueur n'existe pas ou n'a jamais joué sur MCCI.");
+            }
+
+            if (!json.data || !json.data.player) {
+                throw new Error("Données vides reçues pour ce joueur.");
+            }
+
+            return json.data.player;
+        }
+
+        function displayData(player, originalName) {
+            // Remplir les infos
+            ui.name.textContent = originalName;
+            ui.uuid.textContent = player.uuid;
+            ui.avatar.src = `https://crafatar.com/avatars/${player.uuid}?overlay`;
+            
+            // Statut
+            if(player.status && player.status.online) {
+                ui.status.textContent = "EN LIGNE";
+                ui.status.className = "status-badge online";
+            } else {
+                ui.status.textContent = "HORS LIGNE";
+                ui.status.className = "status-badge offline";
+            }
+
+            // Wallet (avec séparateur de milliers)
+            ui.coins.textContent = (player.wallet?.coins || 0).toLocaleString();
+            ui.gems.textContent = (player.wallet?.gems || 0).toLocaleString();
+
+            // Factions
+            ui.list.innerHTML = '';
+            const factions = player.progression?.factions || [];
+            
+            if(factions.length === 0) {
+                ui.list.innerHTML = '<li style="text-align:center; color:#555; padding:10px;">Aucune faction</li>';
+            } else {
+                // Tri par niveau
+                factions.sort((a,b) => b.level - a.level);
+                
+                factions.forEach(f => {
+                    const li = document.createElement('li');
+                    li.className = 'faction-row';
+                    li.innerHTML = `
+                        <span style="color:#ccc">${f.name}</span>
+                        <span class="level">Niv. ${f.level}</span>
+                    `;
+                    ui.list.appendChild(li);
+                });
+            }
+
+            // Afficher la carte
+            ui.card.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
